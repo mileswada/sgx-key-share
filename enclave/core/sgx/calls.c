@@ -1009,6 +1009,27 @@ oe_result_t oe_call_host_function(
         false /* non-switchless */);
 }
 
+static void _stitch_ecall_stack(oe_sgx_td_t* td, uint64_t* first_enclave_frame)
+{
+    oe_ecall_context_t* ecall_context = td->host_ecall_context;
+
+    if (ecall_context &&
+        oe_is_outside_enclave(ecall_context, sizeof(*ecall_context)))
+    {
+        uint64_t host_rbp = ecall_context->debug_eenter_rbp;
+        uint64_t host_rip = ecall_context->debug_eenter_rip;
+
+        /* Check that the supplied host frame (hpst_rbp, host_rip) are set and
+         * really lies outside before stitching the stack */
+        if (oe_is_outside_enclave((void*)host_rbp, sizeof(uint64_t)) &&
+            oe_is_outside_enclave((void*)host_rip, sizeof(uint64_t)))
+        {
+            first_enclave_frame[0] = host_rbp;
+            first_enclave_frame[1] = host_rip;
+        }
+    }
+}
+
 /*
 **==============================================================================
 **
@@ -1107,6 +1128,15 @@ void __oe_handle_main(
     uint64_t* output_arg1,
     uint64_t* output_arg2)
 {
+    /* Get pointer to the thread data structure */
+    oe_sgx_td_t* td = td_from_tcs(tcs);
+
+    /* Stitch the stack. Pass the caller's frame for fix up.
+     * Note that before stitching, the caller's frame points
+     * to the host stack right before switiching to the enclave
+     * stack (see .construct_stack_frame in enter.S). */
+    _stitch_ecall_stack(td, __builtin_frame_address(1));
+
     oe_code_t code = oe_get_code_from_call_arg1(arg1);
     uint16_t func = oe_get_func_from_call_arg1(arg1);
     uint16_t arg1_result = oe_get_result_from_call_arg1(arg1);
@@ -1152,9 +1182,6 @@ void __oe_handle_main(
             return;
         }
     }
-
-    /* Get pointer to the thread data structure */
-    oe_sgx_td_t* td = td_from_tcs(tcs);
 
     // Initialize the enclave the first time it is ever entered. Note that
     // this function DOES NOT call global constructors. Global construction

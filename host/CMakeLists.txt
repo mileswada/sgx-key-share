@@ -196,10 +196,11 @@ if (OE_SGX AND WIN32)
   # set up the frame pointer.
   add_custom_command(
     OUTPUT enter.obj
-    DEPENDS sgx/enter.c
+    DEPENDS sgx/windows/enter.c
     COMMAND
       clang -c -O2 -fomit-frame-pointer -m64 -I${PROJECT_SOURCE_DIR}/include
-      -I${OE_INCDIR} ${CMAKE_CURRENT_SOURCE_DIR}/sgx/enter.c -o enter.obj)
+      -I${OE_INCDIR} ${CMAKE_CURRENT_SOURCE_DIR}/sgx/windows/enter.c -o
+      enter.obj)
 endif ()
 
 # SGX specific files.
@@ -259,6 +260,37 @@ if (OE_SGX)
 
   # OS specific as well.
   if (UNIX)
+    # Look for sgx.h from the kernel headers, which is required by vDSO support
+    # The header only exists after kernel version 5.11
+    execute_process(
+      COMMAND uname -r
+      OUTPUT_VARIABLE LINUX_KERNEL_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    message("-- The kernel version is ${LINUX_KERNEL_VERSION}")
+
+    set(LINUX_KERNEL_SGX_HEADER_PATH
+        "/lib/modules/${LINUX_KERNEL_VERSION}/build/arch/x86/include/uapi/asm")
+
+    message("-- Looking for sgx.h")
+
+    find_file(
+      LINUX_KERNEL_SGX_HEADER
+      NAMES "sgx.h"
+      PATHS ${LINUX_KERNEL_SGX_HEADER_PATH}
+      NO_DEFAULT_PATH)
+
+    if (LINUX_KERNEL_SGX_HEADER)
+      message("-- Looking for sgx.h - found")
+
+      file(COPY ${LINUX_KERNEL_SGX_HEADER}
+           DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+      list(APPEND PLATFORM_SDK_ONLY_SRC sgx/linux/vdso.c)
+    elseif ()
+      message("-- Looking for sgx.h - not found")
+    endif ()
+
     list(APPEND PLATFORM_HOST_ONLY_SRC sgx/linux/sgxquoteproviderloader.c
          sgx/linux/sgxquoteexloader.c)
 
@@ -266,7 +298,7 @@ if (OE_SGX)
       APPEND
       PLATFORM_SDK_ONLY_SRC
       sgx/linux/aep.S
-      sgx/enter.c
+      sgx/linux/enter.c
       sgx/linux/exception.c
       sgx/linux/sgxioctl.c
       sgx/linux/switchless.c
@@ -286,6 +318,10 @@ if (OE_SGX)
       sgx/windows/sgxquoteexloader.c
       sgx/windows/xstate.c)
   endif ()
+
+  # The vdso_stub.c should be included after vdso.c so that the linker will
+  # pick the strong symbols defined in the latter when possible.
+  list(APPEND PLATFORM_SDK_ONLY_SRC sgx/vdso_stub.c)
 
   set(PLATFORM_FLAGS "-m64")
 elseif (OE_TRUSTZONE)
@@ -354,10 +390,10 @@ target_link_libraries(oehost PUBLIC oe_includes)
 
 if (OE_SGX)
   target_include_directories(
-    oehost PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/sgxsdk/include)
+    oehost PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/sgxsdk/include
+                   ${CMAKE_CURRENT_BINARY_DIR})
   target_include_directories(
     oehostverify PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/sgxsdk/include)
-
 endif ()
 
 if (WIN32)
@@ -373,7 +409,8 @@ if (OE_SGX AND UNIX)
   # It is compiled with -O2 flag to retain the same generated assembly
   # code in both debug and release builds.
   set_source_files_properties(
-    oehost sgx/enter.c PROPERTIES COMPILE_FLAGS "-O2 -fno-omit-frame-pointer")
+    oehost sgx/linux/enter.c PROPERTIES COMPILE_FLAGS
+                                        "-O2 -fno-omit-frame-pointer")
 endif ()
 
 add_dependencies(oehost syscall_untrusted_edl)

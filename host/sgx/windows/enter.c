@@ -6,9 +6,9 @@
 #include <openenclave/internal/constants_x64.h>
 #include <openenclave/internal/registers.h>
 #include <openenclave/internal/sgx/ecall_context.h>
-#include "asmdefs.h"
-#include "enclave.h"
-#include "xstate.h"
+#include "../asmdefs.h"
+#include "../enclave.h"
+#include "../xstate.h"
 
 // Define a variable with given name and bind it to the register with the
 // corresponding name. This allows manipulating the register as a normal
