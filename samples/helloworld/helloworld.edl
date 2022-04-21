@@ -7,6 +7,7 @@ enclave {
 
     trusted {
         public void enclave_helloworld();
+        public int compute_square(int num);
     };
 
     untrusted {

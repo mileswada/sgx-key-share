@@ -75,6 +75,23 @@ int main(int argc, const char* argv[])
         goto exit;
     }
 
+
+    // Call compute square function
+    int enclave_computation;
+    int input = 5;
+    result = compute_square(enclave, &enclave_computation, input);
+    if (result != OE_OK)
+    {
+        fprintf(
+            stderr,
+            "calling into compute_square failed: result=%u (%s)\n",
+            result,
+            oe_result_str(result));
+        goto exit;
+    } else {
+        fprintf(stdout, "Square of %d: %d\n", input, enclave_computation);
+    }
+
     ret = 0;
 
 exit:

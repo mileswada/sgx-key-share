@@ -31,3 +31,10 @@ void enclave_helloworld()
             oe_result_str(result));
     }
 }
+
+int compute_square(int num) {
+
+    fprintf(stdout, "Input Received: %d\n", num);
+
+    return num * num;
+}
