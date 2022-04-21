@@ -34,7 +34,7 @@ void enclave_helloworld()
 
 int compute_square(int num) {
 
-    fprintf(stdout, "Input Received: %d\n", num);
+    fprintf(stdout, "Input Received: %d\nCalculating output...\n", num);
 
     return num * num;
 }
