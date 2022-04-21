@@ -26,7 +26,7 @@ void enclave_helloworld()
     {
         fprintf(
             stderr,
-            "Call to host_helloworld failed: result=%u (%s)\n",
+            "Call to host_helloworld failed:  result=%u (%s)\n",
             result,
             oe_result_str(result));
     }
